@@ -18,14 +18,15 @@ class SendFile
         SendFile();
         ~SendFile();
 
-        void startSendFile(const std::string &filename);        //开始发送文件
+        void startSendFile(std::string &filename);        //开始发送文件
 
     private:
         std::string getBroadCastAddress(void);                  //获取文件广播地址
         std::string extractFileName(std::string filename);      //将文件名从绝对路径中提取出来
         void sendBroadcast(void);                               //持续发送广播
         std::string generateVerificationCode(void);             //随即生成验证码
-
+        void waitRecipientReply(void);                          //线程函数
+        
         std::string addressBroadcast_;                          //广播ip地址
         int         udpPort_;                                   //udp端口号
         int         localPort_;                                 //本地端口
