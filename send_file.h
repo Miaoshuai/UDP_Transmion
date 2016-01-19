@@ -26,7 +26,8 @@ class SendFile
         void sendBroadcast(void);                               //持续发送广播
         std::string generateVerificationCode(void);             //随即生成验证码
         void waitRecipientReply(void);                          //线程函数
-        
+        void checkConnect(const std::string &randomCode);       //检查连接状态
+        UdpDataPack *makeUdpDataPacket(int number,int type,char *data); //生成udp数据包
         std::string addressBroadcast_;                          //广播ip地址
         int         udpPort_;                                   //udp端口号
         int         localPort_;                                 //本地端口
@@ -35,4 +36,5 @@ class SendFile
         sockaddr_in localAddress_;                              //本地地址
         sockaddr_in recvAddress_;                               //接收端地址
         std::string identifyCode_;                              //验证码
+        int         eventFd_;                                   //用于事件通知
 };
