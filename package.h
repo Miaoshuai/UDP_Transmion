@@ -32,5 +32,6 @@ struct UdpDataPacket
     int  packetType;                            //包的类型
     int  packetNumber;                          //包的编号
     char packetData[BUFFER_SIZE];               //包的数据
+    int  dataLength;                            //数据的长度
 };
 
