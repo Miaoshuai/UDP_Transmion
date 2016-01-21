@@ -6,11 +6,17 @@
     > Created Time: 2016年01月20日 星期三 14时41分19秒
  =======================================================*/
 #include "tools.h"
+#include "package.h"
 
-#include<string>
-#include<sys/types.h>
-#include<ifaddrs.h>
-#include<stdlib.h>
+#include <string>
+#include <sys/types.h>
+#include <ifaddrs.h>
+#include <stdlib.h>
+#include <string.h>
+#include <sys/socket.h>
+#include <netinet/in.h>
+#include <arpa/inet.h>
+
 
 std::string SendFile::getBroadCastAddress(void)
 {
@@ -86,4 +92,24 @@ std::string SendFile::extractFileName(std::string filename)
     int pos = filename.find_last_of('/');
 
     return std::string(filename.substr(pos + 1));
+}
+
+
+UdpDataPacket *SendFile::makeUdpDataPacket(int number,int type,char *data)
+{
+    UdpDataPacket *p = new UdpDataPacket;
+    p->packetNumber = number;
+    p->packetType = type;
+    strcpy(p->packetData,data);
+    p->dataLength = strlen(data);
+    return pu;
+}
+
+
+void SendFile::makeSockAddress(const sockaddr_in &sockaddr,char *address,int port)
+{
+    bzero(&sockaddr,sizeof(sockaddr));
+    sockaddr.sin_family = AF_INET;
+    inet_pton(AF_INET,address,&sockaddr.sin_addr);
+    sockaddr.sin_port = htons(port);
 }
