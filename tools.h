@@ -7,7 +7,11 @@
  =======================================================*/
 #pragma once
 
+#include "package.h"
+
 #include <string>
+
+struct sockaddr_in; //前向声明
 
 //获取广播地址
 std::string getBroadcastAddress(void);
@@ -17,4 +21,10 @@ std::string getLocalIpAddress(void);
 
 //将文件名从文件的绝对路径中提取出来
 std::string extractFilename(std::string filename);
+
+//生成UDP数据包
+UdpDataPack *makeUdpDataPacket(int number,int type,char *data);
+
+//生成套接字地址
+void makeSockAddress(const sockaddr_in &sockaddr,char *address,int port);
 
