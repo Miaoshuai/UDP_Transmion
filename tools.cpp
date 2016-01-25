@@ -18,7 +18,7 @@
 #include <arpa/inet.h>
 
 
-std::string SendFile::getBroadCastAddress(void)
+std::string getBroadcastAddress(void)
 {
    ifaddrs *ifAddrStruct = NULL;
     
@@ -54,7 +54,7 @@ std::string SendFile::getBroadCastAddress(void)
 }
 
 
-std::string GetLocalIpAddress(void)
+std::string getLocalIpAddress(void)
 {
     ifaddrs *ifAddrStruct = NULL;
     char addressBuffer[100];
@@ -87,7 +87,7 @@ std::string GetLocalIpAddress(void)
 }
 
 
-std::string SendFile::extractFileName(std::string filename)
+std::string extractFilename(std::string filename)
 {
     int pos = filename.find_last_of('/');
 
@@ -95,18 +95,18 @@ std::string SendFile::extractFileName(std::string filename)
 }
 
 
-UdpDataPacket *SendFile::makeUdpDataPacket(int number,int type,char *data)
+UdpDataPacket *makeUdpDataPacket(int number,int type,const char *data)
 {
     UdpDataPacket *p = new UdpDataPacket;
     p->packetNumber = number;
     p->packetType = type;
     strcpy(p->packetData,data);
     p->dataLength = strlen(data);
-    return pu;
+    return p;
 }
 
 
-void SendFile::makeSockAddress(const sockaddr_in &sockaddr,char *address,int port)
+void makeSockAddress(sockaddr_in &sockaddr,const char *address,int port)
 {
     bzero(&sockaddr,sizeof(sockaddr));
     sockaddr.sin_family = AF_INET;
