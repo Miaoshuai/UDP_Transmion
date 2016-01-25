@@ -10,6 +10,7 @@
 
 #pragma once
 
+
 #define UDP_PORT   "3333"                       //广播端口号
 #define LOCAL_PORT "2222"                       //本地端口号
 #define BUFFER_SIZE 1024                        //缓冲区大小
@@ -24,7 +25,7 @@ enum PACKET_TYPE
     SEND_END,                                   //此状态表明此包为数据的终止包
     SEND_UDP,                                   //此状态表明此包为广播包
     SEND_CORRECT,                               //此状态表明为对端连接成功的包
-    SEND_UNCORRENT                              //此状态表明为对端连接失败的包
+    SEND_UNCORRECT                              //此状态表明为对端连接失败的包
 };
 
 struct UdpDataPacket
