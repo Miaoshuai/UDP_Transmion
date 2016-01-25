@@ -15,23 +15,27 @@
 #include <netinet/in.h>
 #include <arpa/inet.h>
 #include <unistd.h>
-#include <sys/type.h>
+#include <sys/types.h>
 #include <stdlib.h>
 #include <random>
 #include <thread>
 #include <fcntl.h>
 #include <ctime>
+#include <assert.h>
 #include <functional>
 #include <memory>
 #include <sys/eventfd.h>
+#include <string.h>
+
+int status = UNCONNECT;
 
 SendFile::SendFile()
     :eventFd_(eventfd(0,0))
 {
     //生成广播地址
-    makeSockAddrss(udpAddress_,getBroadCastAddress().c_str(),atoi(UDP_PORT));
+    makeSockAddress(udpAddress_,getBroadcastAddress().c_str(),atoi(UDP_PORT));
     //生成本地地址
-    makeSockAddrss(localAddress_,getLocalIpAddress().c_str(),atoi(LOCAL_PORT));
+    makeSockAddress(localAddress_,getLocalIpAddress().c_str(),atoi(LOCAL_PORT));
     //配置udpFd_套接字
     configureUdpFd();     
 }
@@ -41,14 +45,14 @@ SendFile::~SendFile()
 
 }
 
-SendFile::startSendFile(std::string &filename)
+void SendFile::startSendFile(std::string &filename)
 {
     //发送广播
     sendBroadcast();
     //给接收端发送所传的文件名
-    std::string fileName = extractFileName(filename);
+    std::string fileName = extractFilename(filename);
     //构建起始包
-    std::unique_ptr<UdpDataPacket> startPtr = makeUdpDataPacket(0,SEND_START,fileName.c_str());
+    std::unique_ptr<UdpDataPacket> startPtr(makeUdpDataPacket(0,SEND_START,fileName.c_str()));
     sendto(udpFd_,startPtr.get(),sizeof(UdpDataPacket),0,(sockaddr *)&recvAddress_,sizeof(recvAddress_));
     
     //获取所发送文件的套接字描述符
@@ -60,11 +64,11 @@ SendFile::startSendFile(std::string &filename)
     int sum  = 0;
     int ret;
     //构建数据包
-    std::unique_ptr<UdpDataPacket> dataPtr = makeUdpDataPacket(++i,SEND_DATA,"\0");
+    std::unique_ptr<UdpDataPacket> dataPtr(makeUdpDataPacket(++i,SEND_DATA,"\0"));
     //从文件中读取数据并发送给接收端
     while((ret = read(fd,dataPtr->packetData,BUFFER_SIZE -1)) > 0)
     {
-        std::cout"包数:"<<++j<<"   "<<"ret:"<<ret<<std::endl;
+        std::cout<<"包数:"<<++j<<"   "<<"ret:"<<ret<<std::endl;
         sum += ret;
         dataPtr->dataLength = ret;
         sendto(udpFd_,dataPtr.get(),sizeof(UdpDataPacket),0,(sockaddr *)&recvAddress_,sizeof(recvAddress_));
@@ -73,7 +77,7 @@ SendFile::startSendFile(std::string &filename)
     std::cout<<"sum = "<<sum<<std::endl;
     std::cout<<"包总数 = "<<j<<std::endl;
     //构建终止包
-    std::unique_ptr<UdpDataPacket> endPtr = makeUdpDataPacket(++j,SEND_END,"\0");
+    std::unique_ptr<UdpDataPacket> endPtr(makeUdpDataPacket(++j,SEND_END,"\0"));
     //发送终止包
     sleep(5);
     sendto(udpFd_,endPtr.get(),sizeof(UdpDataPacket),0,(sockaddr *)&recvAddress_,sizeof(recvAddress_));
@@ -94,7 +98,7 @@ void SendFile::waitRecipientReply(void)
         //接受验证码
         ret = recvfrom(udpFd_,recvBuf,BUFFER_SIZE - 1,0,(sockaddr *)&recvAddress_,&len);
         assert(ret > 0);
-        cout<<inet_ntoa(recvAddress_.sin_addr)<<endl;
+        std::cout<<inet_ntoa(recvAddress_.sin_addr)<<std::endl;
         recvBuf[ret] = '\0';
         identifyCode_ = recvBuf;
         status = CONNECT;
@@ -118,7 +122,7 @@ void SendFile::sendBroadcast(void)
     std::string randomCode;
     //生成验证码
     randomCode = generateVerificationCode(); 
-    std::count<<"验证码为:"<<randomCode<<std::endl;
+    std::cout<<"验证码为:"<<randomCode<<std::endl;
 
     while(1)
     {
@@ -159,22 +163,13 @@ void SendFile::checkConnect(const std::string &randomCode)
             //构建连接不成功的数据包
             std::unique_ptr<UdpDataPacket> dataPtr(makeUdpDataPacket(0,SEND_UNCORRECT,"\0"));
             //发送不成功包
-            sendto(udpFd_,dataPtr.get(),sizeof(UdpDataPacket),(sockaddr *)recvAddress_,sizeof(recvAddress_));
+            sendto(udpFd_,dataPtr.get(),sizeof(UdpDataPacket),0,(sockaddr *)&recvAddress_,sizeof(recvAddress_));
         }
     }
 }
 
-UdpDataPacket *SendFile::makeUdpDataPacket(int number,int type,char *data)
-{
-    UdpDataPacket *p = new UdpDataPacket;
-    p->packetNumber = number;
-    p->packetType = type;
-    strcpy(p->packetData,data);
-    p->dataLength = strlen(data);
-    return pu;
-}
 
-std::string generateVerificationCode(void)
+std::string SendFile::generateVerificationCode(void)
 {
     std::uniform_int_distribution<unsigned> u(0,9);
     std::default_random_engine e(std::time(0));
@@ -189,13 +184,6 @@ std::string generateVerificationCode(void)
     return tempStr;   
 }
 
-void SendFile::makeSockAddrss(const sockaddr_in &sockaddr,char *address,int port)
-{
-    bzero(&sockaddr,sizeof(sockaddr));
-    sockaddr.sin_family = AF_INET;
-    inet_pton(AF_INET,address,&sockaddr.sin_addr);
-    sockaddr.sin_port = htons(port);
-}
 
 
 void SendFile::configureUdpFd(void)
@@ -205,7 +193,7 @@ void SendFile::configureUdpFd(void)
 
     //设置端口重用
     int val = 1;
-    if(setsockopt(udpFd_.SOL_SOCKET,SO_REUSEADDR,(void *)&val,sizeof(int)) < 0)
+    if(setsockopt(udpFd_,SOL_SOCKET,SO_REUSEADDR,(void *)&val,sizeof(int)) < 0)
     {
         std::cout<<"重置失败!\n"<<std::endl;
     }
