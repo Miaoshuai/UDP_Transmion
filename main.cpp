@@ -4,7 +4,8 @@
     > Mail: 945970809@qq.com 
     > Created Time: 2015年10月12日 星期一 21时13分03秒
  ************************************************************************/
-#include"udp_transmision.h"
+#include"send_file.h"
+#include"recv_file.h"
 #include<iostream>
 
 using std::cout;
@@ -31,13 +32,14 @@ int main(int argc,char **argv)
 		case 1:
 			{
  				SendFile sf;  
-				sf.StartSendFile(argv[1]);
+                std::string s(argv[1]);
+				sf.startSendFile(s);
 			 	break; 
 			}
 		case 2:
 			{
   		 	 	RecvFile  rf; 
-				rf.StartRecvFile();break;
+				rf.startRecvFile();break;
 			}
 	}
 	
