@@ -23,8 +23,8 @@ std::string getLocalIpAddress(void);
 std::string extractFilename(std::string filename);
 
 //生成UDP数据包
-UdpDataPack *makeUdpDataPacket(int number,int type,char *data);
+UdpDataPacket *makeUdpDataPacket(int number,int type,const char *data);
 
 //生成套接字地址
-void makeSockAddress(const sockaddr_in &sockaddr,char *address,int port);
+void makeSockAddress(sockaddr_in &sockaddr,const char *address,int port);
 
