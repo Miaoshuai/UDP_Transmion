@@ -10,8 +10,15 @@
 #include "tools.h"
 
 #include <string>
+#include <string.h>
 #include <iostream>
 #include <memory>
+#include <assert.h>
+#include <sys/socket.h>
+#include <netinet/in.h>
+#include <arpa/inet.h>
+#include <unistd.h>
+#include <fcntl.h>
 #include <assert.h>
 
 RecvFile::RecvFile()
@@ -37,7 +44,7 @@ void RecvFile::startRecvFile(void)
     //获得连接
     getConnection();
     //获得套接字描述符
-    int fd = getFilFd();
+    int fd = getFileFd();
     //设置接受套接字
     setRecvFd(1024*1024*5);
 
@@ -46,15 +53,15 @@ void RecvFile::startRecvFile(void)
     int i = 0;
     int j = 0;
     int sum = 0;
-    UdpDataPack data;
+    UdpDataPacket data;
     bzero(&data,sizeof(data));
-    socket_t = len = sizeof(sendAddress_);
+    socklen_t len = sizeof(sendAddress_);
     //循环读取数据
     while((ret = recvfrom(recvFd_,&data,sizeof(data),0,(sockaddr *)&sendAddress_,&len)))
     {
         sum += ret;
         j++;
-        std::cout<<"包数:"<<j;"     "<<"ret:"<<ret<<"包号:"<<data.packetNumber<<std::endl;
+        std::cout<<"包数:"<<j<<"     "<<"ret:"<<ret<<"包号:"<<data.packetNumber<<std::endl;
         //判断数据包是否是终止包，若是则退出循环
         if(data.packetType == SEND_END)
         {
@@ -64,7 +71,7 @@ void RecvFile::startRecvFile(void)
         //如果是数据包，则将其写入文件，或存入set集合
         if(data.packetType == SEND_DATA)
         {
-            if(data.packNumber == (i + 1))
+            if(data.packetNumber == (i + 1))
             {
                 ret = write(fd,data.packetData,data.dataLength);
                 assert(ret >= 0);
@@ -72,7 +79,7 @@ void RecvFile::startRecvFile(void)
             }
             else if(!recvDataSet_.empty())
             {
-                checkSetData(i);
+                checkSetData(i,fd,data);
             }
             else
             {
@@ -89,8 +96,9 @@ void RecvFile::startRecvFile(void)
 
 void RecvFile::getConnection(void)
 {
-    std::unique_ptr<UdpDataPack> udpPtr = makeUdpDataPacket(-1,SEND_DATA,"\0");
-    ret = recvfrom(recvFd_,udpPtr.get(),sizeof(UdpDataPack),0,(sockaddr *)&sendAddress_,&len);
+    std::unique_ptr<UdpDataPacket> udpPtr(makeUdpDataPacket(-1,SEND_DATA,"\0"));
+    socklen_t len = sizeof(sendAddress_);
+    int ret = recvfrom(recvFd_,udpPtr.get(),sizeof(UdpDataPacket),0,(sockaddr *)&sendAddress_,&len);
 
     std::string identifyCode;
     std::cout<<"请输入验证码"<<std::endl;
@@ -101,7 +109,7 @@ void RecvFile::getConnection(void)
         //先将滞留在接受缓冲区中的广播数据读完
         do
         {
-            ret = recvfrom(recvFd_,udpPtr.get(),sizeof(UdpDataPack),0,(sockaddr *)&sendAddress_,&sizeof(sendAddress_));
+            ret = recvfrom(recvFd_,udpPtr.get(),sizeof(UdpDataPacket),0,(sockaddr *)&sendAddress_,&len);
             assert(ret <= 0);
         }while(udpPtr->packetType == SEND_UDP);
         
@@ -115,24 +123,25 @@ void RecvFile::getConnection(void)
 }
 
 
-int  getFilFd(void)
+int  RecvFile::getFileFd(void)
 {
-    std::unique_ptr<UdpDataPack> dataPtr = makeUdpDataPacket(0,SEND_DATA,"/0");
-    int ret = recvfrom(recvFd_,dataPtr.get(),sizeof(UdpDataPack),0,(sockaddr *)&sendAddress_,&sizeof(sendAddress_));
+    socklen_t len = sizeof(sendAddress_);
+    std::unique_ptr<UdpDataPacket> dataPtr(makeUdpDataPacket(0,SEND_DATA,"/0"));
+    int ret = recvfrom(recvFd_,dataPtr.get(),sizeof(UdpDataPacket),0,(sockaddr *)&sendAddress_,&len);
 
     std::string filename("/tmp/");
     filename += dataPtr->packetData;
     
     //打开并创建与上面收到文件名一样的文件
     int fd;
-    fd = open(filename.c_str,O_WRONLY | O_CREAT | O_EXCL,S_IRUSR,S_IWUSR,S_IXUSR)
+    fd = open(filename.c_str(),O_WRONLY | O_CREAT | O_EXCL,S_IRUSR,S_IWUSR,S_IXUSR);
     assert(fd > 0);
 
     return fd;
 }
 
 
-void setRecvFd(int on)
+void RecvFile::setRecvFd(int on)
 {
     unsigned length = sizeof(on);
     
@@ -141,8 +150,9 @@ void setRecvFd(int on)
 }
 
 
-void checkSetData(int &n)
+void RecvFile::checkSetData(int &n,int fd,UdpDataPacket &data)
 {
+    int ret;
     for(auto it : recvDataSet_)
     {
         if(it.packetNumber == (n + 1))
