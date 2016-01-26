@@ -26,18 +26,24 @@
 #include <memory>
 #include <sys/eventfd.h>
 #include <string.h>
+#include <stdio.h>
+#include <sys/time.h>
+#include <signal.h>
+#include <atomic>
 
 int status = UNCONNECT;
+static std::atomic<double> total_(0.0);
 
 SendFile::SendFile()
     :eventFd_(eventfd(0,0))
 {
     //生成广播地址
-    makeSockAddress(udpAddress_,getBroadcastAddress().c_str(),atoi(UDP_PORT));
+    std::string broadAddress(getBroadcastAddress());
+    makeSockAddress(udpAddress_,broadAddress.c_str(),atoi(UDP_PORT));
     //生成本地地址
     makeSockAddress(localAddress_,getLocalIpAddress().c_str(),atoi(LOCAL_PORT));
     //配置udpFd_套接字
-    configureUdpFd();     
+    configureUdpFd();
 }
 
 SendFile::~SendFile()
@@ -61,20 +67,21 @@ void SendFile::startSendFile(std::string &filename)
     std::cout<<"开始发送文件"<<std::endl;
     int i = 0;
     int j = 0;
-    int sum  = 0;
     int ret;
     //构建数据包
     std::unique_ptr<UdpDataPacket> dataPtr(makeUdpDataPacket(++i,SEND_DATA,"\0"));
+    //设置定时器
+    setTimer();
     //从文件中读取数据并发送给接收端
     while((ret = read(fd,dataPtr->packetData,BUFFER_SIZE -1)) > 0)
     {
         std::cout<<"包数:"<<++j<<"   "<<"ret:"<<ret<<std::endl;
-        sum += ret;
+        total_ = total_ + ret;
         dataPtr->dataLength = ret;
         sendto(udpFd_,dataPtr.get(),sizeof(UdpDataPacket),0,(sockaddr *)&recvAddress_,sizeof(recvAddress_));
         dataPtr->packetNumber = ++i;
     }
-    std::cout<<"sum = "<<sum<<std::endl;
+    std::cout<<"sum = "<<total_<<std::endl;
     std::cout<<"包总数 = "<<j<<std::endl;
     //构建终止包
     std::unique_ptr<UdpDataPacket> endPtr(makeUdpDataPacket(++j,SEND_END,"\0"));
@@ -118,6 +125,7 @@ void SendFile::sendBroadcast(void)
     std::unique_ptr<UdpDataPacket> dataPtr;
     //用于接受客户端验证码的线程
     std::thread recvThread(std::bind(&SendFile::waitRecipientReply,this));
+    recvThread.detach();
     
     std::string randomCode;
     //生成验证码
@@ -134,6 +142,7 @@ void SendFile::sendBroadcast(void)
         checkConnect(randomCode);
         if(status == CONNECT)
         {
+            printf("333\n");
             close(eventFd_);
             break;
         }
@@ -142,6 +151,7 @@ void SendFile::sendBroadcast(void)
         assert(ret == sizeof(buffer));
         usleep(AMOUT);      
     }
+    printf("444\n");
           
 }
 
@@ -207,4 +217,29 @@ void SendFile::configureUdpFd(void)
     {
         std::cout<<"设置失败!\n"<<std::endl;
     }
+}
+
+
+void SendFile::printRate(int n)
+{
+    static int preVal = 0;  //上一次sum的值
+    //std::cout<<total_<<std::endl;
+    double rate = (total_ - preVal)/(1024*1024);
+    std::cout<<"rate:"<<rate<<"M/s"<<std::endl;
+}
+
+void SendFile::setTimer(void)
+{
+    struct itimerval tick;
+    
+    signal(SIGALRM,printRate);
+    
+    tick.it_value.tv_sec = 1;
+    tick.it_value.tv_usec = 0;
+
+    tick.it_interval.tv_sec = 1;
+    tick.it_interval.tv_usec = 0;
+    
+    int res = setitimer(ITIMER_REAL,&tick,NULL);
+    //assert(res > 0);
 }
